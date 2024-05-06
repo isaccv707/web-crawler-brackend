@@ -21,6 +21,8 @@
   "dependencies": {
     "@types/express": "^4.17.21",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "env-var": "^7.4.1",
     "express": "^4.19.2",
     "puppeteer": "^22.7.1"
   }
