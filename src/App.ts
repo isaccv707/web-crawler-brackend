@@ -8,25 +8,35 @@ import { envs } from "./config/env";
 const app = express();
 const PORT = envs.PORT ;
 
-interface Data {
+interface PageInfo {
+    title: string;
+    description: string;
+    keywords: string[];
     links: string[];
     images: string[];
+    text: string;
 }
 
 app.use(cors());
 
-
-async function getLinksAndImages(url: string): Promise<Data> {
+async function getPageInfo(url: string): Promise<PageInfo> {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
     await page.goto(url);
-    const result = await page.evaluate(() => {
+
+    const pageInfo: PageInfo = await page.evaluate(() => {
+        const title = document.title;
+        const description = (document.querySelector('meta[name="description"]') as HTMLMetaElement)?.content || '';
+        const keywords = ((document.querySelector('meta[name="keywords"]') as HTMLMetaElement)?.content || '').split(',');
         const links = Array.from(document.querySelectorAll('a')).map(link => link.href);
         const images = Array.from(document.querySelectorAll('img')).map(img => img.src);
-        return { links, images };
+        const text = document.body.innerText;
+
+        return { title, description, keywords, links, images, text };
     });
+
     await browser.close();
-    return result;
+    return pageInfo;
 }
 
 app.get('/api/data', async (req, res) => {
@@ -35,12 +45,14 @@ app.get('/api/data', async (req, res) => {
         if (!url) {
             throw new Error('No se proporcionó ninguna URL');
         }
-        const { links, images } = await getLinksAndImages(url);
+        const pageInfo = await getPageInfo(url);
         await Promise.all([
-            fs.writeFile('links.txt', links.join('\n')),
-            fs.writeFile('images.txt', images.join('\n'))
+            fs.writeFile('page_info.json', JSON.stringify(pageInfo, null, 2)),
+            fs.writeFile('links.txt', pageInfo.links.join('\n')),
+            fs.writeFile('images.txt', pageInfo.images.join('\n'))
         ]);
-        res.json({ links, images});
+        const {title, description, keywords, links, images, text} = pageInfo;
+        res.json({title, description, keywords, links, images, text});
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ error: 'Error al obtener datos' });
